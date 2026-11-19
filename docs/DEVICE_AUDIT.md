@@ -113,3 +113,19 @@ cd "$HOME" && ./rish -c 'dumpsys package com.wireguard.android | grep -E "User (
 Официальное подтверждение того, что профильный администратор *может* назначать Always-on VPN, не доказывает доступность функции на конкретной прошивке: [Android Enterprise — Networking](https://developer.android.com/work/dpc/network-telephony.html).
 
 Источники по механизму Android: [DevicePolicyManager](https://developer.android.com/reference/android/app/admin/DevicePolicyManager), [Android Enterprise — Networking](https://developer.android.com/work/dpc/network-telephony.html).
+
+
+## Подтверждение установленного WireGuard через `dumpsys` — 19 ноября 2026
+
+В реальном выводе `dumpsys package com.wireguard.android` на устройстве:
+
+| Пакет | User 0 | User 10 |
+|---|---|---|
+| `com.wireguard.android` | `installed=true` | `installed=true`, `stopped=false`, `notLaunched=false` |
+| `net.typeblog.shelter` | `installed=true` | `installed=true` |
+
+**Результат: PASS — WireGuard установлен в рабочем профиле.** Более ранний пустой ответ `pm list packages --user 10` оказался недостаточным для определения состояния установки на этой прошивке. Нужно скорректировать сам скрипт диагностики, чтобы его вывод не вводил в заблуждение.
+
+**Следующий gate:** открыть *Настройки Android → Сеть и интернет → VPN*, найти WireGuard, относящийся к рабочему профилю, и проверить наличие отдельных переключателей Always-on VPN и «Блокировать соединения без VPN». На этом шаге **не включать** блокировку без настроенного туннеля. Если нужного пункта нет, проверить возможности Shelter как владельца профиля; по документации Android это реализуется через `DevicePolicyManager.setAlwaysOnVpnPackage(..., lockdownEnabled=true)`, но доступность UI на данной прошивке пока неизвестна.
+
+**Не подтверждено:** работа туннеля, отдельный Lockdown, отсутствие утечек и прохождение T01–T12. Claude остаётся в основном профиле. Отчёт с конфиденциальными данными не публиковался.
