@@ -29,8 +29,14 @@ else
   exit 3
 fi
 
+# rish may print "Entering shell..." to stdout before the command result.
+# Strip that exact banner, but preserve any other unexpected output for validation.
+strip_rish_banner() {
+  sed 's/\r$//; /^[[:space:]]*Entering shell\.\.\.[[:space:]]*$/d'
+}
+
 # Prevent Termux-only commands from being mistaken for privileged Android shell checks.
-uid="$(run_shell 'id -u' 2>/dev/null | tr -d '\r\n ' || true)"
+uid="$(run_shell 'id -u' 2>/dev/null | strip_rish_banner | tr -d '\r\n ' || true)"
 if [ "$uid" != '2000' ]; then
   printf '%s\n' "Authorized Android shell not available (uid=$uid). Check Shizuku/rish or ADB authorization." >&2
   exit 4
@@ -52,7 +58,7 @@ probe() {
   printf '%s: ' "$key"
   result="$(run_shell "$command_text" 2>&1)" && status=0 || status=$?
   if [ "$status" -eq 0 ]; then
-    result="$(printf '%s' "$result" | tr -d '\r' | head -n 4)"
+    result="$(printf '%s\n' "$result" | strip_rish_banner | head -n 4)"
     [ -n "$result" ] || result='(empty)'
     printf '%s\n' "$result"
   else
