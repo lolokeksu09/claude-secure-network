@@ -33,4 +33,4 @@
 
 ## Текущий статус
 
-Этап 1 — read-only аудит целевого Lenovo **выполнен** (19 ноября 2026). Выявлены Android 17/API 37, признак Managed Users, только основной профиль ID 0, отсутствие Always-on/Lockdown в основном профиле, отсутствие WireGuard и Shelter. Санитизированная сводка и ограничения: [docs/DEVICE_AUDIT.md](docs/DEVICE_AUDIT.md). **Создание рабочего профиля — `PASS` (`User 10`, Shelter `ManagedProfileOwner`); независимый профильный Lockdown — `NOT VERIFIED`; T01–T12 — `NOT RUN`.** Реализация VPN, APK и выпуск не выполнялись.
+Этап 1 — read-only аудит целевого Lenovo **выполнен** (19 ноября 2026). Выявлены Android 17/API 37, признак Managed Users, только основной профиль ID 0, отсутствие Always-on/Lockdown в основном профиле, отсутствие WireGuard и Shelter. Санитизированная сводка и ограничения: [docs/DEVICE_AUDIT.md](docs/DEVICE_AUDIT.md). **Рабочий профиль — `PASS` (`User 10`, Shelter `ManagedProfileOwner`); WireGuard в рабочем профиле — `PASS` (подтверждено `dumpsys`, `installed=true`); независимый профильный Lockdown — `NOT VERIFIED`; T01–T12 — `NOT RUN`.** Реализация VPN, APK и выпуск не выполнялись.
