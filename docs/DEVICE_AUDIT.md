@@ -80,13 +80,27 @@ curl -fL https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/mai
 |---|---|
 | Профили | `User 0` и `User 10`, Shelter остаётся `ManagedProfileOwner` |
 | WireGuard, User 0 | `pm list packages` обнаруживает `com.wireguard.android` |
-| WireGuard, User 10 | `pm list packages` не обнаруживает пакет — установка/клонирование **не подтверждены** |
+| WireGuard, User 10 | `pm list packages` возвращает пусто — наличие пакета **не установлено**: даже Shelter в User 10 даёт пустой результат |
 | Always-on/Lockdown, User 0 | `null` / `0` |
 | Always-on/Lockdown, User 10 | Пустой ответ — **состояние не установлено** |
 | Claude, User 10 | Не обнаружен; миграции нет |
 | Сетевые испытания T01–T12 | `NOT RUN` |
 
 **Следующее действие:** в Shelter клонировать WireGuard из основного профиля в рабочий. Проверить появление приложения среди рабочих и повторить read-only аудит. До подтверждения отдельного VPN Lockdown не переносить Claude.
+
+## Проверка 19 ноября 2026, 22:17 — уточнение интерпретации пакетов
+
+После попытки клонирования WireGuard очередной read-only отчёт повторно вывел `(empty)` для `pm list packages --user 10` — **в том числе для Shelter**, хотя `cmd device_policy list-owners` подтверждает Shelter как `ManagedProfileOwner` пользователя 10. Поэтому пустую выдачу нельзя считать доказательством того, что WireGuard отсутствует в профиле: доступность перечисления пакетов для `shell` может быть ограничена, либо приложение действительно не клонировано.
+
+**Промежуточный статус:** `User 10` подтверждён, наличие WireGuard в рабочем профиле — `UNKNOWN / NOT VERIFIED`. Исходный лог не публикуется.
+
+**Следующая read-only проверка (Shizuku/rish):**
+
+```sh
+cd "$HOME" && ./rish -c 'dumpsys package com.wireguard.android | grep -E "User (0|10):" | head -n 12; dumpsys package net.typeblog.shelter | grep -E "User (0|10):" | head -n 12'
+```
+
+Строка `User 10: ... installed=true` для `com.wireguard.android` является более предметной проверкой, чем пустой `pm list packages`, но её следует сверить с наличием запускаемого приложения WireGuard в Shelter. Если `dumpsys` недоступен или не показывает состояние пользователей, не считать отсутствие строк доказательством отсутствия приложения.
 
 ## Следующий шаг
 
