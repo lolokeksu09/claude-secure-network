@@ -1,0 +1,40 @@
+# Android / local IDE
+.gradle/
+.idea/
+*.iml
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Python / temporary
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
+*.tmp
+.DS_Store
+
+# Secrets and local VPN configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.wgconf
+*.conf
+*.ovpn
+*.mobileconfig
+*credentials*
+*private-key*
+*private_key*
+*token*
+
+# Local diagnostic exports / captures
+captures/
+diagnostics/
+secrets/
+backups/
