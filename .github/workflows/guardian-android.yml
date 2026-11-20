@@ -42,6 +42,21 @@ jobs:
           gradle-version: '8.11.1'
       - name: Test and compile debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - name: Verify that policy tests actually ran
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+          reports = glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")
+          if not reports:
+              raise SystemExit("No JUnit reports found")
+          totals = [ET.parse(path).getroot().attrib for path in reports]
+          tests = sum(int(x.get("tests", "0")) for x in totals)
+          failures = sum(int(x.get("failures", "0")) + int(x.get("errors", "0")) for x in totals)
+          if tests < 4 or failures:
+              raise SystemExit(f"Policy gate checks incomplete: tests={tests}, failures={failures}")
+          print(f"Verified {tests} JUnit tests, {failures} failures")
+          PY
       - name: Upload unsigned-for-release debug artifact
         uses: actions/upload-artifact@v4
         with:
