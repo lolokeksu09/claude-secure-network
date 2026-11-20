@@ -1,0 +1,74 @@
+name: Guardian Android (signed, manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sign-guardian:
+    # Never give a pull-request build signing material. Run only reviewed main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: guardian-signing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Ensure Android SDK
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          if [ ! -d "$ANDROID_HOME/platforms/android-35" ] || [ ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]; then
+            SDK_MANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+            test -n "$SDK_MANAGER"
+            "$SDK_MANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-35" "build-tools;35.0.0"
+          fi
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build unsigned release and run unit tests
+        run: gradle :app:testDebugUnitTest :app:assembleRelease --no-daemon
+      - name: Verify policy tests
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+          reports = glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")
+          assert reports, "No unit-test reports"
+          totals = [ET.parse(path).getroot().attrib for path in reports]
+          tests = sum(int(x.get("tests", 0)) for x in totals)
+          failures = sum(int(x.get("failures", 0)) + int(x.get("errors", 0)) for x in totals)
+          assert tests >= 8 and failures == 0, f"Insufficient tests: {tests}, failures: {failures}"
+          print(f"Policy tests: {tests}; failures: {failures}")
+          PY
+      - name: Sign with persistent secret and enforce certificate fingerprint
+        env:
+          CSN_KEYSTORE_BASE64: ${{ secrets.CSN_SIGNING_KEYSTORE_BASE64 }}
+          CSN_SIGNING_ALIAS: ${{ secrets.CSN_SIGNING_ALIAS }}
+          CSN_SIGNING_STORE_PASSWORD: ${{ secrets.CSN_SIGNING_STORE_PASSWORD }}
+          CSN_SIGNING_KEY_PASSWORD: ${{ secrets.CSN_SIGNING_KEY_PASSWORD }}
+          CSN_EXPECTED_CERT_SHA256: ${{ vars.CSN_EXPECTED_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          test -n "$CSN_KEYSTORE_BASE64" || { echo "Keystore secret not configured"; exit 1; }
+          test -n "$CSN_EXPECTED_CERT_SHA256" || { echo "Expected signer fingerprint not configured"; exit 1; }
+          umask 077
+          export CSN_SIGNING_KEYSTORE="$RUNNER_TEMP/csn-guardian-signing.jks"
+          printf '%s' "$CSN_KEYSTORE_BASE64" | base64 --decode > "$CSN_SIGNING_KEYSTORE"
+          mkdir -p signed-output
+          bash scripts/guardian-sign-apk.sh \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            signed-output/CSN-Guardian-signed.apk
+          rm -f "$CSN_SIGNING_KEYSTORE"
+      - name: Upload verified signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: csn-guardian-verified-signed
+          path: signed-output/CSN-Guardian-signed.apk
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,91 @@
+name: Guardian Android (debug build)
+on:
+  push:
+    branches: [ main, feat/csn-guardian-dpc ]
+    paths:
+      - 'app/**'
+      - 'scripts/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/guardian-android.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'scripts/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/guardian-android.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify and install Android SDK components
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          if [ -d "$ANDROID_HOME/platforms/android-35" ] && [ -d "$ANDROID_HOME/build-tools/35.0.0" ]; then
+            echo "Required SDK components already present"
+          else
+            SDK_MANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+            test -n "$SDK_MANAGER"
+            "$SDK_MANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-35" "build-tools;35.0.0"
+          fi
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Validate signing and preflight scripts
+        run: |
+          bash -n scripts/guardian-sign-apk.sh scripts/guardian-termux-create-key.sh scripts/guardian-termux-sign.sh scripts/test-guardian-termux-sign.sh scripts/guardian-workprofile-preflight.sh
+          python3 -m py_compile scripts/guardian-apk-cert.py
+      - name: Test and compile debug plus unsigned release APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --no-daemon
+      - name: Verify APK signing certificate audit tool
+        run: |
+          set -euo pipefail
+          certificate="$(python3 scripts/guardian-apk-cert.py app/build/outputs/apk/debug/app-debug.apk)"
+          [[ "$certificate" =~ ^[0-9a-f]{64}$ ]]
+          echo "Read APK signing certificate SHA-256: $certificate"
+      - name: Test local signer with disposable PKCS12 key
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/build-tools/35.0.0:$PATH"
+          bash scripts/test-guardian-termux-sign.sh app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Verify that policy tests actually ran
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+          reports = glob.glob("app/build/test-results/testDebugUnitTest/TEST-*.xml")
+          if not reports:
+              raise SystemExit("No JUnit reports found")
+          totals = [ET.parse(path).getroot().attrib for path in reports]
+          tests = sum(int(x.get("tests", "0")) for x in totals)
+          failures = sum(int(x.get("failures", "0")) + int(x.get("errors", "0")) for x in totals)
+          if tests < 4 or failures:
+              raise SystemExit(f"Policy gate checks incomplete: tests={tests}, failures={failures}")
+          print(f"Verified {tests} JUnit tests, {failures} failures")
+          PY
+      - name: Upload unsigned-for-release debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: csn-guardian-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Upload UNSIGNED release candidate (not installable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: csn-guardian-unsigned-release-not-installable
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
