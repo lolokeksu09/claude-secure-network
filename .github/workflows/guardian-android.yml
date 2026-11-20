@@ -4,6 +4,7 @@ on:
     branches: [ main, feat/csn-guardian-dpc ]
     paths:
       - 'app/**'
+      - 'scripts/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
@@ -11,6 +12,7 @@ on:
   pull_request:
     paths:
       - 'app/**'
+      - 'scripts/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
@@ -40,8 +42,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Test and compile debug APK
-        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - name: Validate signing and preflight scripts
+        run: |
+          bash -n scripts/guardian-sign-apk.sh scripts/guardian-termux-create-key.sh scripts/guardian-termux-sign.sh scripts/guardian-workprofile-preflight.sh
+          python3 -m py_compile scripts/guardian-apk-cert.py
+      - name: Test and compile debug plus unsigned release APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --no-daemon
       - name: Verify APK signing certificate audit tool
         run: |
           set -euo pipefail
@@ -69,3 +75,10 @@ jobs:
           name: csn-guardian-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Upload UNSIGNED release candidate (not installable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: csn-guardian-unsigned-release-not-installable
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
