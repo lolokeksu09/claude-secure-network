@@ -75,3 +75,15 @@ Implemented improvements:
 - Validate `android.net.VpnService.SUPPORTS_ALWAYS_ON` opt-out metadata before displaying eligible services.
 
 **Remaining runtime gate:** install and test v0.1.1 on the Lenovo; compare its count with Android Settings. No migration of Shelter, VPN policy, timezone or DUORAY settings is authorized by this patch.
+
+## Alpha 0.1.2 — measured device readback
+
+The 0.1.1-alpha report from the Lenovo showed:
+- Android API 37
+- `Profile Owner: false` (as expected while Shelter owns the managed profile)
+- `VPN services returned: 1`, `rejected: 0`, `eligible packages: 1`
+- `WireGuard package visible: true`
+
+**Do not infer that the single VPN service is WireGuard.** Package presence and VpnService discovery are different observations. The personal-profile query also does not enumerate the work-profile app context. The 0.1.2 diagnostic now includes `Current Android profile: personal/work` using the documented `UserManager.isManagedProfile()` API and the exact *eligible* VPN package IDs returned by the app's PackageManager query. This is intentionally not a full installed app list.
+
+G1 (read-only UI/device) partially verified. G2-G6 remain `NOT RUN`. Android allows DPC ownership transfers only through the current owning DPC's supported transfer flow, otherwise a new managed profile may be needed. **Do not remove Shelter without backups and explicit approval.**
