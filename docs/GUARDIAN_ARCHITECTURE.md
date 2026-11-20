@@ -175,3 +175,7 @@ For the *existing* installed Guardian, a new permanent key alone cannot update i
 package: first determine whether its original signing key still exists. If not, any
 profile recreation or migration is a separate **data-destructive** operation requiring
 explicit informed approval and verified backup. No reset authorized or performed.
+
+## Stable APK signing process
+
+See [SIGNING.md](SIGNING.md) for the updated Lenovo User 11 ownership facts, confirmed CI debug-key mismatch, read-only installed certificate audit, and the manually gated permanent signing workflow. Stable signing has been configured in source, but no original private signing key has been recovered and no in-place upgrade is verified.
