@@ -1,5 +1,18 @@
 # CSN Guardian — independent Android profile controller (alpha)
 
+## Current status: User 11, 20 November 2026
+
+The sections describing Shelter `User 10` below are historical stages, not
+the current device state. The owner removed that old profile and provisioned
+`User 11 — CSN Secure`, confirmed as Guardian `ManagedProfileOwner`.
+Installed v0.1.2-alpha was signed with the ephemeral CI key in run 18;
+v0.1.3-alpha is blocked from an in-place upgrade by a signature mismatch.
+A persistent user-owned signing workflow, unsigned candidate and pre-migration
+read-only audit were prepared. No work-profile deletion, data restoration,
+VPN Lockdown or image-sharing test was performed for the newer APK.
+See [SIGNING.md](SIGNING.md) and [MIGRATION.md](MIGRATION.md).
+
+
 ## Goal
 
 Ship a small dedicated Android Device Policy Controller (DPC), **not** a copy of Shelter.
