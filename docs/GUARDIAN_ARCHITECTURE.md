@@ -87,3 +87,34 @@ The 0.1.1-alpha report from the Lenovo showed:
 **Do not infer that the single VPN service is WireGuard.** Package presence and VpnService discovery are different observations. The personal-profile query also does not enumerate the work-profile app context. The 0.1.2 diagnostic now includes `Current Android profile: personal/work` using the documented `UserManager.isManagedProfile()` API and the exact *eligible* VPN package IDs returned by the app's PackageManager query. This is intentionally not a full installed app list.
 
 G1 (read-only UI/device) partially verified. G2-G6 remain `NOT RUN`. Android allows DPC ownership transfers only through the current owning DPC's supported transfer flow, otherwise a new managed profile may be needed. **Do not remove Shelter without backups and explicit approval.**
+
+
+## Alpha 0.1.2 — verified Lenovo device result (20 Nov 2026)
+
+The owner installed the alpha and copied its diagnostic report:
+
+| Probe | Result |
+|---|---|
+| `Profile Owner` | `false` |
+| Current Android profile | `personal` |
+| `queryIntentServices(VpnService.SERVICE_INTERFACE)` | 1 service |
+| Rejected services | 0 |
+| Eligible package IDs | `com.wireguard.android` only |
+| WireGuard package visibility | `true` |
+| OS | Android API 37 |
+
+**Observed fact:** the app's package manager query detects WireGuard only. DUORAY appears in the user's Android VPN settings, but no DUORAY package was returned by this query. **Neither the package name nor the cause has been independently established.** Do not infer DUORAY lacks VPN support or install privileges; package visibility and exact service registration remain to be checked. <queries> includes the VPN action and WireGuard's explicit package name.
+
+### Next minimal read-only probe
+
+With Shizuku running, open Termux and execute:
+
+```sh
+cd "$HOME" && ./rish -c 'sleep 10; dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | head -n 4'
+```
+
+Switch to **DUORAY** during the ten seconds. The output should identify the foreground DUORAY package using `ActivityRecord{... u0 PACKAGE/...}`. Do not paste any config or subscription link. If this view is empty, use the system package info screen or an alternate `dumpsys window` foreground activity probe.
+
+After identifying the actual DUORAY package, inspect its **service registration** and Always-on opt-out metadata via Android shell before proposing explicit package visibility. Do not broaden permissions to `QUERY_ALL_PACKAGES` merely to enumerate VPN apps. No policy writes or profile migration during diagnosis.
+
+**Security consequence:** even if the client is discoverable, it is not yet proven suitable for Android Always-on + Lockdown, and client-side `direct` routes require separate review. Prior Shelter profile and DUORAY subscription remain unchanged.
