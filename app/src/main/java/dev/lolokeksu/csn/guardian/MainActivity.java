@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.pm.PackageInfo;
@@ -58,6 +59,9 @@ public final class MainActivity extends Activity {
     private Button enforceButton;
     private Button emergencyButton;
     private Button provisionButton;
+    private TextView photoShareState;
+    private static final String PHOTO_SHARE_PREFS = "guardian_photo_sharing";
+    private static final String PHOTO_SHARE_ENABLED = "images_to_personal_last_applied";
     private final List<String> vpnPackages = new ArrayList<>();
     private final Map<String, String> serviceLabels = new LinkedHashMap<>();
 
@@ -131,7 +135,7 @@ public final class MainActivity extends Activity {
 
         label(container, "CSN  /  GUARDIAN", 12, COLOR_ACCENT, true);
         label(container, "Защита профиля", 26, COLOR_TEXT, true);
-        label(container, "Контроль политик Android · v0.1.2 alpha", 13, COLOR_MUTED, false);
+        label(container, "Контроль политик Android · v0.1.3 alpha", 13, COLOR_MUTED, false);
 
         LinearLayout statusCard = card(container);
         label(statusCard, "СТАТУС ПОЛИТИКИ", 11, COLOR_ACCENT, true);
@@ -153,13 +157,18 @@ public final class MainActivity extends Activity {
         enforceButton = button(ownerControls, "Включить Always-on + Lockdown", this::confirmEnforce);
         emergencyButton = button(ownerControls, "Аварийно снять Lockdown", this::confirmEmergency);
 
+        label(ownerControls, "ПЕРЕДАЧА ИЗОБРАЖЕНИЙ", 11, COLOR_ACCENT, true);
+        photoShareState = label(ownerControls, "Последняя настройка: не применялась", 13, COLOR_MUTED, false);
+        button(ownerControls, "Разрешить фото в личный профиль", () -> confirmPhotoSharing(true));
+        button(ownerControls, "Запретить передачу фото", () -> confirmPhotoSharing(false));
+
         provisionButton = button(container, "Создать новый рабочий профиль", this::confirmProvision);
         button(container, "Повторить диагностику", this::refresh);
 
-        label(container, "CSN не получает полномочия от Shizuku. Существующим рабочим "
-                + "профилем управляет Shelter. Владелец профиля может быть только один. "
-                + "Не удаляй Shelter: его удаление уничтожит данные рабочего профиля. "
-                + "Настройки часового пояса общие для всего устройства.", 12, COLOR_MUTED, false);
+        label(container, "CSN не получает полномочия от Shizuku. Политики можно применять "
+                + "только из рабочего профиля, где Guardian — Profile Owner. "
+                + "Обмен фото требует явного разрешения; VPN-защита настраивается отдельно. "
+                + "Часовой пояс общий для всего устройства.", 12, COLOR_MUTED, false);
         setContentView(scroll);
     }
 
@@ -173,7 +182,7 @@ public final class MainActivity extends Activity {
     }
 
     private void copyDiagnostics() {
-        String text = "CSN Guardian v0.1.2-alpha\n"
+        String text = "CSN Guardian v0.1.3-alpha\n"
                 + "Profile Owner: " + isOwner() + "\n"
                 + "Current Android profile: " + currentProfileLabel() + "\n"
                 + "VPN services returned: " + rawVpnServiceCount + "\n"
@@ -251,7 +260,15 @@ public final class MainActivity extends Activity {
     private void refresh() {
         findVpnServices();
         boolean owner = isOwner();
+        boolean workOwner = ImageSharingPolicyGate.allowed(owner, "work".equals(currentProfileLabel()));
         ownerControls.setVisibility(owner ? View.VISIBLE : View.GONE);
+        boolean photoShareRecorded = getSharedPreferences(PHOTO_SHARE_PREFS, MODE_PRIVATE)
+                .contains(PHOTO_SHARE_ENABLED);
+        String photoShareLast = !photoShareRecorded ? "не применялась"
+                : (getSharedPreferences(PHOTO_SHARE_PREFS, MODE_PRIVATE)
+                .getBoolean(PHOTO_SHARE_ENABLED, false) ? "разрешена" : "запрещена");
+        photoShareState.setText("Последняя настройка CSN: " + photoShareLast
+                + ". Состояние Android и доступ к файлам нужно проверить передачей фото.");
         enforceButton.setEnabled(owner && !vpnPackages.isEmpty());
         emergencyButton.setEnabled(owner);
         boolean canProvision = !owner
@@ -283,9 +300,9 @@ public final class MainActivity extends Activity {
 
         if (!owner) {
             statusText.setText("Режим диагностики\nНет полномочий владельца");
-            messageText.setText("Это ожидаемо: активным рабочим профилем управляет Shelter. "
-                    + "Пока CSN не является Profile Owner, приложение не может включить "
-                    + "Lockdown. VPN и настройки телефона не изменены.");
+            messageText.setText("Эта копия не является владельцем профиля. "
+                    + "Открой CSN Guardian со значком портфеля в рабочем профиле. "
+                    + "Политики Android здесь не изменяются.");
             return;
         }
         try {
@@ -373,6 +390,62 @@ public final class MainActivity extends Activity {
                         showMessage("Отключение не удалось: " + ex.getClass().getSimpleName());
                     }
                 }).show();
+    }
+
+    private void confirmPhotoSharing(boolean enable) {
+        if (!ImageSharingPolicyGate.allowed(isOwner(), "work".equals(currentProfileLabel()))) {
+            showMessage("Передачей фото может управлять только Guardian внутри рабочего профиля.");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(enable ? "Разрешить передачу фото?" : "Запретить передачу фото?")
+                .setMessage(enable
+                        ? "После разрешения выбранное вручную изображение из рабочего профиля "
+                        + "можно отправить в приложение личного профиля через Android «Поделиться». "
+                        + "Это ослабляет изоляцию данных, но не отключает VPN. "
+                        + "Передача не происходит автоматически."
+                        : "Удалить добавленные Guardian правила пересылки изображений в личный "
+                        + "профиль? Это не удаляет фото и не меняет VPN.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton(enable ? "Разрешить" : "Запретить",
+                        (d, w) -> applyPhotoSharing(enable))
+                .show();
+    }
+
+    private void applyPhotoSharing(boolean enable) {
+        // Check at the policy write boundary, not only when the dialog opens.
+        if (!ImageSharingPolicyGate.allowed(isOwner(), "work".equals(currentProfileLabel()))) {
+            showMessage("Полномочия рабочего профиля отсутствуют; ничего не изменено.");
+            return;
+        }
+        try {
+            // Guardian currently owns no other custom cross-profile filters.
+            // If more filters are added, rebuild them here instead of clearing independently.
+            dpm.clearCrossProfileIntentFilters(admin);
+            if (enable) {
+                for (String action : new String[]{Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE}) {
+                    IntentFilter filter = new IntentFilter(action);
+                    filter.addCategory(Intent.CATEGORY_DEFAULT);
+                    filter.addDataType("image/*");
+                    // From work (managed) to personal (parent), not the reverse direction.
+                    dpm.addCrossProfileIntentFilter(admin, filter,
+                            DevicePolicyManager.FLAG_PARENT_CAN_ACCESS_MANAGED);
+                }
+            }
+            getSharedPreferences(PHOTO_SHARE_PREFS, MODE_PRIVATE)
+                    .edit().putBoolean(PHOTO_SHARE_ENABLED, enable).apply();
+            refresh();
+            showMessage(enable
+                    ? "Правило передачи изображений добавлено. Попробуй «Поделиться» "
+                    + "из рабочей галереи и выбери личное приложение. "
+                    + "Работу на этой прошивке ещё нужно проверить."
+                    : "Правила Guardian для передачи фото удалены. "
+                    + "Системные правила Android сохранены.");
+        } catch (Exception ex) {
+            // Do not report success when Android rejects a policy write.
+            showMessage("Не удалось изменить передачу фото: "
+                    + ex.getClass().getSimpleName() + ". Проверь настройки рабочего профиля.");
+        }
     }
 
     private void confirmProvision() {
