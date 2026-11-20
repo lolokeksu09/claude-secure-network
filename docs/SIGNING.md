@@ -181,6 +181,7 @@ After obtaining and extracting it to a local location (for example Downloads):
 ```sh
 cd "$HOME"
 curl -fsSL https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/feat/csn-guardian-dpc/scripts/guardian-termux-sign.sh -o guardian-termux-sign.sh
+curl -fsSL https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/feat/csn-guardian-dpc/scripts/guardian-apk-cert.py -o guardian-apk-cert.py
 bash guardian-termux-sign.sh /storage/emulated/0/Download/app-release-unsigned.apk
 ```
 
@@ -188,6 +189,37 @@ The signer prompts for the keystore passphrase, verifies the resulting APK with
 `apksigner`, and confirms its certificate matches the saved public fingerprint.
 Output: `~/CSN-Guardian-newkey-signed.apk`. It is *only for a future work
 profile or clean install*; it **cannot update the existing User 11 installation**.
+
+### Termux signer regression (20 Nov 2026)
+
+The user reported:
+
+```
+Keystore password for signer #1:
+FAIL: the signed APK certificate does not match the saved public key fingerprint.
+```
+
+In the old script, `apksigner sign` and `apksigner verify --min-sdk-version 26`
+had completed successfully. The failure was in a fragile parser that searched
+for an exact English `Signer #1 certificate SHA-256 digest:` line in
+`apksigner verify --print-certs` output. The exact observed `apksigner`
+stdout from the user's Lenovo was not available, so a formatting mismatch is
+**suspected, not proven**.
+
+The updated script obtains the APK signer certificate hash directly from APK
+v2/v3 signature bytes using `guardian-apk-cert.py`, which previously read the
+installed APK correctly. It checks 64 hexadecimal characters and reports
+**both public hashes** if they truly differ, without revealing the signing key.
+A CI integration test creates a disposable PKCS12 key and checks success,
+stale saved fingerprint rejection, and existing-output protection. Android
+on-device retest is still required.
+
+**Do not delete or regenerate the existing `.p12` key** to fix this message.
+Re-download both scripts and re-run the signer. On a true hash mismatch,
+compare with a password-prompted `keytool -list -v -keystore
+~/.local/share/csn-guardian/signing/guardian-release.p12 -alias csn-guardian`.
+Never share a keystore, password, or its Base64 content.
+
 
 For work-profile backup readiness, use
 `scripts/guardian-workprofile-preflight.sh` to create a read-only application
