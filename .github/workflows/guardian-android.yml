@@ -42,6 +42,12 @@ jobs:
           gradle-version: '8.11.1'
       - name: Test and compile debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - name: Verify APK signing certificate audit tool
+        run: |
+          set -euo pipefail
+          certificate="$(python3 scripts/guardian-apk-cert.py app/build/outputs/apk/debug/app-debug.apk)"
+          [[ "$certificate" =~ ^[0-9a-f]{64}$ ]]
+          echo "Read APK signing certificate SHA-256: $certificate"
       - name: Verify that policy tests actually ran
         run: |
           python3 - <<'PY'
