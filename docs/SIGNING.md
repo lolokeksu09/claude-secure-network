@@ -141,6 +141,60 @@ certificate. A newly created keystore does *not* retroactively fix User 11.
 Do not merge or deploy a change claiming the migration succeeded without
 on-device installation and Profile Owner read-back.
 
+## 2a. Termux-first key generation and local APK signing (no GitHub secrets needed)
+
+This is the **recommended preparation path**, because the user controls the signing
+identity from the first build. These scripts were added to the same
+`feat/csn-guardian-dpc` branch. **Do not upload the private `.p12` keystore,
+password, or its Base64 to GitHub, chat, or public cloud.**
+
+In Termux:
+
+```sh
+pkg install openjdk-21 apksigner curl
+cd "$HOME"
+curl -fsSL https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/feat/csn-guardian-dpc/scripts/guardian-termux-create-key.sh -o guardian-termux-create-key.sh
+bash guardian-termux-create-key.sh
+```
+
+Choose a unique strong passphrase at the prompts and preserve it independently.
+The script does not overwrite an existing key. It stores the **PKCS12 keystore**
+in `~/.local/share/csn-guardian/signing/guardian-release.p12` and the **public**
+certificate fingerprint alongside it. Key generation does not interact with
+Android Device Policy Manager, VPN or work profile.
+
+**Off-device backup is essential.** A private copy within Termux alone will be
+lost if Termux is uninstalled or its data is cleared. A password-protected
+PKCS12 file can be copied to the owner's trusted offline storage; keep its
+password in a separate password manager, not alongside the file in public
+storage. Test opening this backup in `keytool -list` on a second device before
+a destructive migration. If using shared `Download` as a temporary transfer,
+remove that shared copy once the offline backup is verified.
+
+A source-verified CI workflow builds an **unsigned release candidate**, named
+`csn-guardian-unsigned-release-not-installable`, in GitHub Actions for this
+branch. The download is a ZIP containing `app-release-unsigned.apk`.
+Do not attempt to install this unsigned APK as-is.
+
+After obtaining and extracting it to a local location (for example Downloads):
+
+```sh
+cd "$HOME"
+curl -fsSL https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/feat/csn-guardian-dpc/scripts/guardian-termux-sign.sh -o guardian-termux-sign.sh
+bash guardian-termux-sign.sh /storage/emulated/0/Download/app-release-unsigned.apk
+```
+
+The signer prompts for the keystore passphrase, verifies the resulting APK with
+`apksigner`, and confirms its certificate matches the saved public fingerprint.
+Output: `~/CSN-Guardian-newkey-signed.apk`. It is *only for a future work
+profile or clean install*; it **cannot update the existing User 11 installation**.
+
+For work-profile backup readiness, use
+`scripts/guardian-workprofile-preflight.sh` to create a read-only application
+inventory in the Termux private directory. It **does not export private app
+data, photos, VPN configurations or passwords**. See [MIGRATION.md](MIGRATION.md)
+for necessary manual exports and the approval gate before any removal.
+
 ## 3. Evidence required to close the issue
 
 1. Record the installed Guardian certificate fingerprint from User 11.
