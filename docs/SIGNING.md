@@ -16,8 +16,12 @@ Inspection of GitHub Actions APK signature blocks:
 | Run 44714525134 (v0.1.3 debug) | `1a80a20ab2e29b933db4374bf7a2479af7497102ef719888ac1bad32497b4338` |
 
 A fresh GitHub runner generates an **ephemeral debug keystore**. These two certificates
-are different. The installed APK's **actual** certificate has yet to be read, so
-do not equate its signer to the earlier workflow artifact without checking.
+are different. On 20 Nov, the Lenovo owner used the read-only APK probe and reported
+`b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c5`.
+**This copied string has only 61 hex characters**, rather than 64 required for SHA-256.
+It is not a valid complete fingerprint, although its starting bytes differ from
+both archived CI APK fingerprints. Obtain the complete 64-character hash before
+deciding the matching keystore has or has not been found. Do **not** remove User 11.
 
 ## 1. Read-only audit on the Lenovo
 
@@ -43,8 +47,20 @@ detects failed reads:
 ```sh
 cd "$HOME"
 set -o pipefail
-./rish -c 'p=$(pm path dev.lolokeksu.csn.guardian | sed -n "s/^package://p" | head -n 1); test -n "$p" && toybox base64 "$p"' | base64 -d > "$HOME/CSN-Guardian-installed.apk" &&
+./rish -c 'p=$(pm path dev.lolokeksu.csn.guardian | sed -n "s/^package://p" | head -n 1); test -n "$p" && toybox base64 "$p"' |
+  sed '/^Entering shell\.\.\.$/d' |
+  base64 -d > "$HOME/CSN-Guardian-installed.apk" &&
 python "$HOME/guardian-apk-cert.py" "$HOME/CSN-Guardian-installed.apk"
+```
+
+The Shizuku rish wrapper on this Lenovo prints `Entering shell...` to stdout.
+Filter this line before decoding, otherwise `base64: invalid input` appears.
+
+To prevent copy truncation, check output length directly:
+
+```sh
+hash=$(python "$HOME/guardian-apk-cert.py" "$HOME/CSN-Guardian-installed.apk")
+printf 'Length: %s\\nSHA256: %s\\n' "${#hash}" "$hash"
 ```
 
 If either command fails, keep Guardian and User 11 installed and capture only
@@ -109,5 +125,4 @@ on-device installation and Profile Owner read-back.
 5. Verify image-sharing fix and re-run VPN policy safety checks.
 6. Store one stable signing process and backed-up key for every future build.
 
-Steps 1–5 remain **NOT RUN** on the Lenovo. No key has been retrieved or
-generated in this repository.
+Step 1 succeeded on the Lenovo but its copied fingerprint was truncated to 61 characters; full readback is still required. Steps 2–5 remain **NOT RUN** on the Lenovo. No original private key has been retrieved or generated in this repository.
