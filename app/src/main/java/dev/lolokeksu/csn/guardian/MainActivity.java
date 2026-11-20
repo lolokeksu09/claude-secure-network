@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.VpnService;
 import android.os.Bundle;
+import android.os.UserManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
@@ -130,7 +131,7 @@ public final class MainActivity extends Activity {
 
         label(container, "CSN  /  GUARDIAN", 12, COLOR_ACCENT, true);
         label(container, "Защита профиля", 26, COLOR_TEXT, true);
-        label(container, "Контроль политик Android · v0.1.1 alpha", 13, COLOR_MUTED, false);
+        label(container, "Контроль политик Android · v0.1.2 alpha", 13, COLOR_MUTED, false);
 
         LinearLayout statusCard = card(container);
         label(statusCard, "СТАТУС ПОЛИТИКИ", 11, COLOR_ACCENT, true);
@@ -172,14 +173,16 @@ public final class MainActivity extends Activity {
     }
 
     private void copyDiagnostics() {
-        String text = "CSN Guardian v0.1.1-alpha\n"
+        String text = "CSN Guardian v0.1.2-alpha\n"
                 + "Profile Owner: " + isOwner() + "\n"
+                + "Current Android profile: " + currentProfileLabel() + "\n"
                 + "VPN services returned: " + rawVpnServiceCount + "\n"
                 + "VPN services rejected by permission/metadata: " + filteredServiceCount + "\n"
                 + "Eligible VPN service packages: " + vpnPackages.size() + "\n"
+                + "Eligible VPN package IDs: " + (vpnPackages.isEmpty() ? "none" : String.join(", ", vpnPackages)) + "\n"
                 + "WireGuard package visible: " + wireGuardInstalled + "\n"
                 + "Android: " + android.os.Build.VERSION.SDK_INT + "\n"
-                + "No VPN keys, account tokens, or installed-app list included.\n";
+                + "Only eligible VPN package IDs included; no VPN keys or account tokens.\n";
         ClipboardManager clipboard = getSystemService(ClipboardManager.class);
         if (clipboard == null) {
             showMessage("Буфер обмена недоступен.");
@@ -191,6 +194,12 @@ public final class MainActivity extends Activity {
 
     private boolean isOwner() {
         return dpm != null && dpm.isProfileOwnerApp(getPackageName());
+    }
+
+    private String currentProfileLabel() {
+        UserManager userManager = getSystemService(UserManager.class);
+        if (userManager == null) return "unknown";
+        return userManager.isManagedProfile() ? "work" : "personal";
     }
 
     private void findVpnServices() {
@@ -252,8 +261,12 @@ public final class MainActivity extends Activity {
         provisionButton.setVisibility(canProvision ? View.VISIBLE : View.GONE);
 
         StringBuilder info = new StringBuilder();
-        info.append("Служб в ответе Android: ").append(rawVpnServiceCount)
-                .append("\nПодходят для Always-on: ").append(vpnPackages.size());
+        info.append("Профиль: ").append("work".equals(currentProfileLabel()) ? "рабочий" : "личный")
+                .append("\nСлужб в ответе Android: ").append(rawVpnServiceCount)
+                .append("\nКандидатов для Always-on: ").append(vpnPackages.size());
+        if (!vpnPackages.isEmpty()) {
+            info.append("\nНайдены: ").append(String.join(", ", vpnPackages));
+        }
         if (filteredServiceCount > 0) {
             info.append("\nИсключены по разрешению или поддержке Always-on: ")
                     .append(filteredServiceCount);
