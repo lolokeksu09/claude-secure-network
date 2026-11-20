@@ -22,6 +22,30 @@ The owner subsequently provided the **full 64-character fingerprint**:
 `b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c55a6`.
 This installed certificate differs from both archived CI APK fingerprints.
 No matching private key has been located or verified. Do **not** remove User 11.
+
+**Original build identified (20 Nov 2026, independent archive inspection):**
+- GitHub Actions **run 44709849744** (run number 18), commit
+  `0bffb0c8e2ddbef32d8f2cf23eb3ce0a7ee49e65`,
+  artifact ID `14615604875`.
+- Archived APK is **21239 bytes**, matching the byte size from Lenovo's
+  `ls -l` command. Its signing certificate SHA-256 is
+  `b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c55a6`,
+  **identical to the installed certificate**.
+- The archived ZIP contains **only `app-debug.apk`**. The workflow ran on
+  GitHub-hosted `ubuntu-latest` and used Android's default debug signing
+  for `assembleDebug`, with **no explicit keystore source or export step**.
+  The Gradle cache configuration shown in the job log caches Gradle data,
+  **not** `~/.android/debug.keystore`.
+- The private signing key is **not recoverable from the GitHub artifact or
+  the APK certificate**. Without a separately preserved copy of that runner's
+  debug keystore, in-place updates cannot use the old signing identity.
+  Finding a different debug keystore does not help unless its certificate
+  SHA-256 matches exactly. GitHub-hosted runner's workspace is ephemeral.
+
+See https://github.com/lolokeksu09/claude-secure-network/actions/runs/44709849744
+for the original run. The source archive and the installed APK were not
+compared byte-for-byte; the signing certificate and APK byte count match.
+
 The owner additionally checked `~/.android/debug.keystore` on the Lenovo/Termux: **file not found**. This checks one default path only, not other local build directories or computers.
 
 ## 1. Read-only audit on the Lenovo
@@ -120,7 +144,7 @@ on-device installation and Profile Owner read-back.
 ## 3. Evidence required to close the issue
 
 1. Record the installed Guardian certificate fingerprint from User 11.
-2. Identify an available private signing key with the matching certificate.
+2. Identify an available private signing key with the matching certificate. The exact GitHub run is known, but its ephemeral key has not been preserved in the available artifact.
 3. Sign an APK with that key, validate it with `apksigner verify --print-certs`.
 4. Install without removing User 11 and confirm version and unchanged Profile Owner.
 5. Verify image-sharing fix and re-run VPN policy safety checks.
