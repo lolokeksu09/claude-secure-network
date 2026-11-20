@@ -1,6 +1,6 @@
 # Claude Secure Network
 
-Проект изолированной сетевой среды для Claude на Android. **Android-приложение CSN Guardian (0.1.0-alpha) уже собрано, но пока не проверено на устройстве и не применяется к действующему профилю Shelter.** Реальная VPN-защита ещё не развёрнута.
+Проект изолированной сетевой среды для Claude на Android. **CSN Guardian v0.1.2-alpha установлен на Lenovo, является Profile Owner рабочего профиля `User 11 — CSN Secure`.** Версия v0.1.3-alpha собрана в CI, но НЕ установлена: её APK подписан другим временным сертификатом. Реальная VPN-защита ещё не подтверждена.
 
 ## Цель
 
@@ -12,6 +12,8 @@
 
 - [Техническое задание v1.0](docs/TECHNICAL_SPECIFICATION.md) — функциональные требования, сценарии отказа и критерии приёмки.
 - [Аудит устройства](docs/DEVICE_AUDIT.md) — безопасная диагностика профилей, политик VPN и инструкция Termux.
+- [Подпись APK](docs/SIGNING.md) — происхождение установленной подписи, создание постоянного ключа и сборка с проверкой.
+- [Безопасная миграция](docs/MIGRATION.md) — резервные копии, контрольные этапы и запрет автоматического удаления рабочего профиля.
 - [PROJECT.md](PROJECT.md) — актуальные продуктовые решения и границы первой версии.
 - [AGENTS.md](AGENTS.md) — правила работы над проектом из Project Workflow Standard v1.0.
 - [TESTING-LEVELS.md](TESTING-LEVELS.md) — риск-ориентированная система проверок.
@@ -23,13 +25,20 @@
 
 - Код: [app/](app/). Android 26+, Java 17, `compileSdk=35`, без разрешения `INTERNET`.
 - Контроль: перечисление установленных VPN-служб; только Profile Owner может назначить Always-on + Lockdown с ручным подтверждением; проверка применения политики.
-- Сборка: CI выполняет `gradle :app:testDebugUnitTest :app:assembleDebug` с Gradle 8.11.1/JDK17. Статус сборки проверять по фактическому GitHub Actions run.
-- Безопасная миграция: Shelter уже владеет рабочим профилем `User 10`. Данные профиля будут утрачены при его удалении; новый контроллер НЕ удаляет и НЕ заменяет его автоматически. Сначала нужны резервные копии и отдельное разрешение.
-- Доступ к сети, включая DUORAY и настройки личного профиля, сейчас не изменён. APK не установлен на Lenovo.
+- Сборка: CI выполняет `gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease` с Gradle 8.11.1/JDK17 и публикует НЕПОДПИСАННЫЙ release-кандидат. Он не предназначен для установки до подписи стабильным ключом.
+- Безопасная миграция: старый профиль Shelter (`User 10`) удалён владельцем; текущим профилем `User 11` управляет Guardian. Удаление `User 11` уничтожит рабочие приложения и данные. Пока резервные копии и новая подписанная сборка не готовы, профиль не трогать.
+- Поддержка DUORAY и фактический fail-closed не проверены. Команды новой подписи не меняют Android-политики и не устанавливают APK на Lenovo.
 
-### Guardian v0.1.2-alpha
+### Guardian v0.1.3-alpha: подготовка без удаления профиля
 
-The Lenovo confirmed the diagnostic sees one eligible VPN service, but that service's identity is not yet known. Version 0.1.2 adds the exact eligible VPN package IDs and the Android profile type to the read-only report. It does not gain ownership of Shelter or change VPN settings. Device validation of 0.1.2 remains pending.
+На Android 17 / API 37 подтверждён `User 11` как `ManagedProfileOwner`, а установленная `v0.1.2-alpha` имеет сертификат SHA-256
+`b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c55a6`.
+Он относится к GitHub Actions run №18 (эфемерный debug-ключ). Исходный закрытый ключ не сохранён в доступных CI-артефактах. Новая `v0.1.3-alpha` не может обновить его напрямую.
+
+В ветке подготовлены `scripts/guardian-termux-create-key.sh`,
+`scripts/guardian-termux-sign.sh`,
+`scripts/guardian-workprofile-preflight.sh` и стабильный manual workflow подписи.
+Генерировать приватный ключ рекомендуется на собственном телефоне, сохраняя защищённую офлайн-копию. **Ни новая подпись, ни бэкап, ни миграция рабочего профиля пока не выполнялись на устройстве.**
 
 ## Первый запуск
 
@@ -45,10 +54,12 @@ The Lenovo confirmed the diagnostic sees one eligible VPN service, but that serv
 - [x] Применена документационная основа Project Workflow Standard v1.0.
 - [x] Диагностический скрипт подготовлен; проверен на тестовой имитации Android shell.
 - [x] Read-only диагностика выполнена на целевом Lenovo (19.11.2026); выводы записаны в [DEVICE_AUDIT.md](docs/DEVICE_AUDIT.md).
-- [x] Рабочий профиль Shelter создан (`User 10`; владелец `ManagedProfileOwner`) и подтверждён повторным аудитом.
+- [x] Исторически профиль Shelter `User 10` создавался; затем удалён владельцем. Новый `User 11 — CSN Secure` создан и проверен как Guardian `ManagedProfileOwner`.
 - [ ] Независимый Always-on VPN + Lockdown рабочего профиля проверены на прошивке.
 - [x] Собран базовый CSN Guardian DPC: проверка владельца профиля, выбор установленного VPN-сервиса, назначение Always-on/Lockdown и чтение состояния политики.
 - [ ] Реализована и проверена конфигурация VPN на устройстве.
+- [x] Подготовлены безопасные скрипты постоянной подписи, read-only инвентаризации и unsigned release-кандидат.
+- [ ] Выполнены создание и офлайн-бэкап нового ключа, подпись и реальная проверка на Lenovo.
 - [ ] Выполнены испытания T01–T12 на телефоне.
 
 ## Безопасность
