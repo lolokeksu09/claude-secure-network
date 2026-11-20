@@ -31,7 +31,7 @@ def take_lp32(data, offset):
 
 def signing_cert_hash(path):
     data = Path(path).read_bytes()
-    eocd = data.rfind(b"PK\\x05\\x06")
+    eocd = data.rfind(b"PK\x05\x06")
     if eocd < 0 or eocd + 22 > len(data):
         raise ValueError("APK ZIP directory missing")
     central_dir = u32(data, eocd + 16)
