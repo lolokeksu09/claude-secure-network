@@ -18,10 +18,10 @@ Inspection of GitHub Actions APK signature blocks:
 A fresh GitHub runner generates an **ephemeral debug keystore**. These two certificates
 are different. On 20 Nov, the Lenovo owner used the read-only APK probe and reported
 `b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c5`.
-**This copied string has only 61 hex characters**, rather than 64 required for SHA-256.
-It is not a valid complete fingerprint, although its starting bytes differ from
-both archived CI APK fingerprints. Obtain the complete 64-character hash before
-deciding the matching keystore has or has not been found. Do **not** remove User 11.
+The owner subsequently provided the **full 64-character fingerprint**:
+`b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c55a6`.
+This installed certificate differs from both archived CI APK fingerprints.
+No matching private key has been located or verified. Do **not** remove User 11.
 
 ## 1. Read-only audit on the Lenovo
 
@@ -125,4 +125,4 @@ on-device installation and Profile Owner read-back.
 5. Verify image-sharing fix and re-run VPN policy safety checks.
 6. Store one stable signing process and backed-up key for every future build.
 
-Step 1 succeeded on the Lenovo but its copied fingerprint was truncated to 61 characters; full readback is still required. Steps 2–5 remain **NOT RUN** on the Lenovo. No original private key has been retrieved or generated in this repository.
+Step 1 **PASS** on Lenovo: installed certificate SHA-256 recorded above (64 characters). Steps 2–5 remain **NOT RUN** on the Lenovo. No original private key has been retrieved or generated in this repository.
