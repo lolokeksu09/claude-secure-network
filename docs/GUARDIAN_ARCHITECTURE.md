@@ -118,3 +118,37 @@ Switch to **DUORAY** during the ten seconds. The output should identify the fore
 After identifying the actual DUORAY package, inspect its **service registration** and Always-on opt-out metadata via Android shell before proposing explicit package visibility. Do not broaden permissions to `QUERY_ALL_PACKAGES` merely to enumerate VPN apps. No policy writes or profile migration during diagnosis.
 
 **Security consequence:** even if the client is discoverable, it is not yet proven suitable for Android Always-on + Lockdown, and client-side `direct` routes require separate review. Prior Shelter profile and DUORAY subscription remain unchanged.
+
+## Alpha 0.1.3 — image share work → personal (opt-in, unverified on device)
+
+**Reported on-device:** managed profile `User 11: CSN Secure` exists; 
+`cmd device_policy list-owners` reported 
+`dev.lolokeksu.csn.guardian/.GuardianAdminReceiver,ManagedProfileOwner(parentUserId=0)`.
+The personal Guardian copy still reports `Profile Owner: false`, which is correct for user 0.
+
+**Observed user problem:** image/photo sharing from the managed profile to the personal profile is blocked.
+**Working hypothesis:** Guardian registers no DPC-owned cross-profile share-intent filter and Android does not permit the intended forward direction by default. This is not yet reproduced with the specific source/target apps on the Lenovo.
+
+The v0.1.3 patch adds explicit owner-only UI controls for `ACTION_SEND` and 
+`ACTION_SEND_MULTIPLE`, MIME `image/*`, direction 
+`DevicePolicyManager.FLAG_PARENT_CAN_ACCESS_MANAGED` (managed-origin requests 
+handled by a personal-profile app). No automatic access or file copying: user selects a photo 
+and a destination through Android Sharesheet. The switch defaults **off** until the owner explicitly consents.
+
+- Disable removes **only cross-profile intent filters added by the Guardian DPC**.
+  System default filters remain, per Android documentation.
+- Current Guardian has no other DPC-added cross-profile filters. Any future rules must be
+  added to the same centralized rebuild function before extending the feature.
+- Local SharedPreferences records the *last requested policy change*; Android exposes no
+  equivalent public getter for this particular filter, so it is **not** proof of current routing.
+- This is a deliberate reduction of *data* isolation: any matching personal app may be selected
+  by the user to receive shared image content. It does **not** change VPN routing, Lockdown,
+  or grant blanket access to work-profile storage.
+- Real-device test gate: install v0.1.3 over v0.1.2 in both users, open Guardian in
+  managed profile, enable sharing after consent, share JPEG and PNG individually and as
+  multiple images to a personal app, inspect actual transferred bytes, then disable and
+  verify routing blocked again. Also confirm VPN policy unaffected. **NOT RUN**.
+- Some source apps or file providers may still reject cross-profile URI grants; such
+  cases require a targeted file-picker or FileProvider handoff, not broad permissions.
+
+Reference: https://developer.android.com/reference/android/app/admin/DevicePolicyManager#addCrossProfileIntentFilter(android.content.ComponentName,android.content.IntentFilter,int)
