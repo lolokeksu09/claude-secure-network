@@ -210,9 +210,7 @@ The updated script obtains the APK signer certificate hash directly from APK
 v2/v3 signature bytes using `guardian-apk-cert.py`, which previously read the
 installed APK correctly. It checks 64 hexadecimal characters and reports
 **both public hashes** if they truly differ, without revealing the signing key.
-A CI integration test creates a disposable PKCS12 key and checks success,
-stale saved fingerprint rejection, and existing-output protection. Android
-on-device retest is still required.
+CI integration test [run 44733108451](https://github.com/lolokeksu09/claude-secure-network/actions/runs/44733108451) — **PASS** (commit `7560420b2d2d7d93b5aef73047d92c33a6da4c17`): disposable PKCS12 signing, APK signer SHA-256 match, stale saved fingerprint rejection, and existing-output protection. Android on-device retest is still **NOT RUN**.
 
 **Do not delete or regenerate the existing `.p12` key** to fix this message.
 Re-download both scripts and re-run the signer. On a true hash mismatch,
