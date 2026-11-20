@@ -22,6 +22,7 @@ The owner subsequently provided the **full 64-character fingerprint**:
 `b471b54672ebed98ac3d4de547d1a4c4661c7c20b78a10df0d0337a25e5c55a6`.
 This installed certificate differs from both archived CI APK fingerprints.
 No matching private key has been located or verified. Do **not** remove User 11.
+The owner additionally checked `~/.android/debug.keystore` on the Lenovo/Termux: **file not found**. This checks one default path only, not other local build directories or computers.
 
 ## 1. Read-only audit on the Lenovo
 
