@@ -3,6 +3,8 @@
     <!-- This DPC never reads subscription links, transmits data, or implements a VPN tunnel. -->
     <uses-feature android:name="android.software.managed_users" android:required="false"/>
     <queries>
+        <!-- Explicit visibility for the known WireGuard installation diagnostic. -->
+        <package android:name="com.wireguard.android"/>
         <intent>
             <action android:name="android.net.VpnService"/>
         </intent>
