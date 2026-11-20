@@ -21,18 +21,39 @@ do not equate its signer to the earlier workflow artifact without checking.
 
 ## 1. Read-only audit on the Lenovo
 
-With Shizuku authorized, run in Termux:
+**Correction after actual Android 17 failure:** On the Lenovo, 
+`pm path --user 11` followed by `cp` to `/sdcard/Download` did **not**
+create the APK. The user reported a Binder exception and then a missing input file. 
+Do not assume the package path is empty or the stored APK is missing solely from that error.
+
+Package APK installation and signing identity are shared across Android users.
+Because the same package is installed in the primary profile too, prefer querying
+the package without a cross-user override:
 
 ```sh
 cd "$HOME"
-./rish -c 'P=$(pm path --user 11 dev.lolokeksu.csn.guardian | sed -n "s/^package://p" | head -n 1); test -n "$P" && cp "$P" /sdcard/Download/CSN-Guardian-installed.apk'
-curl -fsSL 'https://raw.githubusercontent.com/lolokeksu09/claude-secure-network/feat/csn-guardian-dpc/scripts/guardian-apk-cert.py' -o "$HOME/guardian-apk-cert.py"
-python "$HOME/guardian-apk-cert.py" /storage/emulated/0/Download/CSN-Guardian-installed.apk
+./rish -c 'pm path dev.lolokeksu.csn.guardian'
 ```
 
+If the command displays `package:/data/app/.../base.apk`, transfer only the
+base APK into **Termux's own private directory**, not shared Download. 
+Encoding inside the shell avoids shell storage restrictions; `pipefail`
+detects failed reads:
+
+```sh
+cd "$HOME"
+set -o pipefail
+./rish -c 'p=$(pm path dev.lolokeksu.csn.guardian | sed -n "s/^package://p" | head -n 1); test -n "$p" && toybox base64 "$p"' | base64 -d > "$HOME/CSN-Guardian-installed.apk" &&
+python "$HOME/guardian-apk-cert.py" "$HOME/CSN-Guardian-installed.apk"
+```
+
+If either command fails, keep Guardian and User 11 installed and capture only
+the first command's error text. Do not remove the profile, disable Shizuku
+restrictions, change SELinux or factory-reset to retrieve an APK.
+
 This reads the installed package's **public signing certificate**, not its private
-key. The copy of the installed APK is written to Downloads and can be deleted
-afterwards. Never send VPN subscription material or any keystore/private key.
+key. The copy of the installed APK is local to Termux. Never send VPN subscription
+material or any keystore/private key.
 
 Look for the old private key only on its original signing machine, backups or
 local developer keystores. GitHub Actions run artifacts contain the APK but
