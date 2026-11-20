@@ -5,6 +5,11 @@ import android.app.AlertDialog;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.ClipboardManager;
+import android.content.ClipData;
+import android.content.pm.PackageInfo;
+import android.graphics.drawable.GradientDrawable;
+import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.VpnService;
@@ -42,6 +47,12 @@ public final class MainActivity extends Activity {
     private ComponentName admin;
     private TextView statusText;
     private TextView messageText;
+    private TextView discoveryText;
+    private TextView vpnSectionTitle;
+    private LinearLayout ownerControls;
+    private int rawVpnServiceCount;
+    private int filteredServiceCount;
+    private boolean wireGuardInstalled;
     private Spinner vpnChoice;
     private Button enforceButton;
     private Button emergencyButton;
@@ -83,6 +94,8 @@ public final class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(title);
         button.setAllCaps(false);
+        button.setMinHeight(dp(50));
+        button.setTextColor(COLOR_TEXT);
         button.setOnClickListener(v -> action.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -91,37 +104,89 @@ public final class MainActivity extends Activity {
         return button;
     }
 
+    private LinearLayout card(LinearLayout parent) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        group.setPadding(dp(18), dp(14), dp(18), dp(18));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(18, 22, 27));
+        background.setCornerRadius(dp(18));
+        group.setBackground(background);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(14);
+        parent.addView(group, lp);
+        return group;
+    }
+
     private void buildScreen() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(COLOR_BG);
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(dp(24), dp(36), dp(24), dp(36));
+        container.setPadding(dp(18), dp(24), dp(18), dp(24));
         scroll.addView(container);
 
-        label(container, "CSN / GUARDIAN", 13, COLOR_ACCENT, true);
-        label(container, "Контроль защищённого профиля", 25, COLOR_TEXT, true);
-        label(container, "Android Device Policy Controller • без root", 13, COLOR_MUTED, false);
+        label(container, "CSN  /  GUARDIAN", 12, COLOR_ACCENT, true);
+        label(container, "Защита профиля", 26, COLOR_TEXT, true);
+        label(container, "Контроль политик Android · v0.1.1 alpha", 13, COLOR_MUTED, false);
 
-        statusText = label(container, "Проверка прав…", 15, COLOR_TEXT, true);
-        label(container, "Доступные VPN-клиенты в текущем профиле", 14, COLOR_TEXT, true);
+        LinearLayout statusCard = card(container);
+        label(statusCard, "СТАТУС ПОЛИТИКИ", 11, COLOR_ACCENT, true);
+        statusText = label(statusCard, "Чтение состояния…", 17, COLOR_TEXT, true);
+        messageText = label(statusCard, "", 13, COLOR_MUTED, false);
+
+        LinearLayout vpnCard = card(container);
+        label(vpnCard, "ДИАГНОСТИКА VPN", 11, COLOR_ACCENT, true);
+        discoveryText = label(vpnCard, "Сканирование VPN-служб…", 14, COLOR_TEXT, false);
+        button(vpnCard, "Системные настройки VPN", this::openVpnSettings);
+        button(vpnCard, "Скопировать технический отчёт", this::copyDiagnostics);
+
+        ownerControls = card(container);
+        vpnSectionTitle = label(ownerControls, "ПОЛИТИКА РАБОЧЕГО ПРОФИЛЯ", 11, COLOR_ACCENT, true);
+        label(ownerControls, "Приложение VPN", 14, COLOR_TEXT, true);
         vpnChoice = new Spinner(this);
-        container.addView(vpnChoice, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+        ownerControls.addView(vpnChoice, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        enforceButton = button(ownerControls, "Включить Always-on + Lockdown", this::confirmEnforce);
+        emergencyButton = button(ownerControls, "Аварийно снять Lockdown", this::confirmEmergency);
 
-        enforceButton = button(container, "Включить постоянный VPN + Lockdown", this::confirmEnforce);
-        emergencyButton = button(container, "Аварийное отключение политики", this::confirmEmergency);
-        provisionButton = button(container, "Создать защищённый рабочий профиль", this::confirmProvision);
-        button(container, "Обновить состояние", this::refresh);
+        provisionButton = button(container, "Создать новый рабочий профиль", this::confirmProvision);
+        button(container, "Повторить диагностику", this::refresh);
 
-        messageText = label(container, "", 13, COLOR_MUTED, false);
-        label(container, "Защита сети задаётся Android, а не этой кнопкой. "
-                + "Настроенный Lockdown не доказывает, что выбранный VPN реально подключён. "
-                + "Системный трафик может иметь исключения. "
-                + "Часовой пояс устройства общий для личного и рабочего профилей.", 13, COLOR_MUTED, false);
-
+        label(container, "CSN не получает полномочия от Shizuku. Существующим рабочим "
+                + "профилем управляет Shelter. Владелец профиля может быть только один. "
+                + "Не удаляй Shelter: его удаление уничтожит данные рабочего профиля. "
+                + "Настройки часового пояса общие для всего устройства.", 12, COLOR_MUTED, false);
         setContentView(scroll);
+    }
+
+    private void openVpnSettings() {
+        Intent intent = new Intent(Settings.ACTION_VPN_SETTINGS);
+        try {
+            startActivity(intent);
+        } catch (Exception ex) {
+            showMessage("Системный экран VPN недоступен на этой прошивке.");
+        }
+    }
+
+    private void copyDiagnostics() {
+        String text = "CSN Guardian v0.1.1-alpha\n"
+                + "Profile Owner: " + isOwner() + "\n"
+                + "VPN services returned: " + rawVpnServiceCount + "\n"
+                + "VPN services rejected by permission/metadata: " + filteredServiceCount + "\n"
+                + "Eligible VPN service packages: " + vpnPackages.size() + "\n"
+                + "WireGuard package visible: " + wireGuardInstalled + "\n"
+                + "Android: " + android.os.Build.VERSION.SDK_INT + "\n"
+                + "No VPN keys, account tokens, or installed-app list included.\n";
+        ClipboardManager clipboard = getSystemService(ClipboardManager.class);
+        if (clipboard == null) {
+            showMessage("Буфер обмена недоступен.");
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("CSN diagnostics", text));
+        showMessage("Диагностика скопирована. Она не содержит подписок или VPN-ключей.");
     }
 
     private boolean isOwner() {
@@ -131,13 +196,25 @@ public final class MainActivity extends Activity {
     private void findVpnServices() {
         vpnPackages.clear();
         serviceLabels.clear();
+        rawVpnServiceCount = 0;
+        filteredServiceCount = 0;
         PackageManager pm = getPackageManager();
         Intent intent = new Intent(VpnService.SERVICE_INTERFACE);
-        List<ResolveInfo> services = pm.queryIntentServices(intent, 0);
+        List<ResolveInfo> services = pm.queryIntentServices(intent, PackageManager.GET_META_DATA);
         if (services != null) {
+            rawVpnServiceCount = services.size();
             for (ResolveInfo entry : services) {
-                if (entry.serviceInfo == null) continue;
-                if (!"android.permission.BIND_VPN_SERVICE".equals(entry.serviceInfo.permission)) continue;
+                if (entry.serviceInfo == null
+                        || !"android.permission.BIND_VPN_SERVICE".equals(entry.serviceInfo.permission)) {
+                    filteredServiceCount++;
+                    continue;
+                }
+                if (entry.serviceInfo.metaData != null
+                        && !entry.serviceInfo.metaData.getBoolean(
+                                VpnService.SERVICE_META_DATA_SUPPORTS_ALWAYS_ON, true)) {
+                    filteredServiceCount++;
+                    continue;
+                }
                 String pkg = entry.serviceInfo.packageName;
                 if (!serviceLabels.containsKey(pkg)) {
                     CharSequence name = entry.loadLabel(pm);
@@ -145,11 +222,18 @@ public final class MainActivity extends Activity {
                 }
             }
         }
+        try {
+            pm.getPackageInfo("com.wireguard.android", 0);
+            wireGuardInstalled = true;
+        } catch (PackageManager.NameNotFoundException ex) {
+            wireGuardInstalled = false;
+        }
+
         vpnPackages.addAll(serviceLabels.keySet());
         Collections.sort(vpnPackages);
         List<String> choices = new ArrayList<>();
         for (String pkg : vpnPackages) choices.add(serviceLabels.get(pkg));
-        if (choices.isEmpty()) choices.add("VPN-службы не обнаружены");
+        if (choices.isEmpty()) choices.add("Нет доступных VPN-служб");
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_dropdown_item, choices);
         vpnChoice.setAdapter(adapter);
@@ -158,6 +242,7 @@ public final class MainActivity extends Activity {
     private void refresh() {
         findVpnServices();
         boolean owner = isOwner();
+        ownerControls.setVisibility(owner ? View.VISIBLE : View.GONE);
         enforceButton.setEnabled(owner && !vpnPackages.isEmpty());
         emergencyButton.setEnabled(owner);
         boolean canProvision = !owner
@@ -166,29 +251,45 @@ public final class MainActivity extends Activity {
                 && dpm.isProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE);
         provisionButton.setVisibility(canProvision ? View.VISIBLE : View.GONE);
 
+        StringBuilder info = new StringBuilder();
+        info.append("Служб в ответе Android: ").append(rawVpnServiceCount)
+                .append("\nПодходят для Always-on: ").append(vpnPackages.size());
+        if (filteredServiceCount > 0) {
+            info.append("\nИсключены по разрешению или поддержке Always-on: ")
+                    .append(filteredServiceCount);
+        }
+        if (wireGuardInstalled) {
+            info.append("\nWireGuard установлен в текущем профиле.");
+        }
+        if (vpnPackages.isEmpty()) {
+            info.append("\nНет подходящих служб в результате PackageManager. ")
+                    .append("Это НЕ доказывает отсутствие VPN на телефоне. ")
+                    .append("Сравни с системными настройками VPN.");
+        }
+        discoveryText.setText(info.toString());
+
         if (!owner) {
-            statusText.setText("Режим просмотра — нет полномочий Profile Owner");
-            messageText.setText("Текущий рабочий профиль контролируется другим администратором "
-                    + "или CSN запущен в личном профиле. Нельзя применить Lockdown без статуса "
-                    + "Profile Owner. Никаких изменений не выполнено. "
-                    + "Не удаляйте профиль Shelter без резервной копии.");
+            statusText.setText("Режим диагностики\nНет полномочий владельца");
+            messageText.setText("Это ожидаемо: активным рабочим профилем управляет Shelter. "
+                    + "Пока CSN не является Profile Owner, приложение не может включить "
+                    + "Lockdown. VPN и настройки телефона не изменены.");
             return;
         }
         try {
             String current = dpm.getAlwaysOnVpnPackage(admin);
             boolean lockdown = dpm.isAlwaysOnVpnLockdownEnabled(admin);
-            statusText.setText("Profile Owner: CSN ✓\nПостоянный VPN: "
+            statusText.setText("CSN — владелец профиля\nПостоянный VPN: "
                     + (current == null ? "не задан" : current)
                     + "\nLockdown: " + (lockdown ? "ВКЛ" : "ВЫКЛ"));
             if (current != null && vpnPackages.contains(current)) {
                 vpnChoice.setSelection(vpnPackages.indexOf(current));
             }
             messageText.setText(lockdown
-                    ? "Политика Android установлена. Проверьте реальный сетевой выход и обрыв VPN."
-                    : "Туннель должен быть предварительно настроен внутри VPN-клиента.");
+                    ? "Политика сохранена в Android. Теперь требуются реальные проверки IP, DNS, IPv6 и отказа VPN."
+                    : "Сначала настрой рабочий VPN-туннель; затем вручную включи политику Lockdown.");
         } catch (SecurityException ex) {
-            statusText.setText("Ошибка полномочий Profile Owner");
-            messageText.setText("Системная политика недоступна; операция не выполнена.");
+            statusText.setText("Нет доступа к политике");
+            messageText.setText("Android запретил чтение административной политики. Ничего не изменено.");
             enforceButton.setEnabled(false);
             emergencyButton.setEnabled(false);
         }
