@@ -62,3 +62,16 @@ No changes to user's existing DUORAY tunnel, timezone, Shelter data or identity.
 - https://developer.android.com/work/dpc/network-telephony
 - https://developer.android.com/reference/android/app/admin/DevicePolicyManager
 - https://source.android.com/docs/core/connect/time
+
+## Alpha 0.1.1 — device screenshot driven improvements
+
+Observed on the Lenovo running `v0.1.0-alpha`: CSN successfully launches and reports `NOT_PROFILE_OWNER`, which is expected while Shelter owns Android user 10. It reported zero VPN services even though Android Settings shows several configured VPN apps. The **cause of this discrepancy is not yet verified on-device**. Android package visibility and VpnService metadata can affect the results of `queryIntentServices`.
+
+Implemented improvements:
+- Compact role-aware screen: hide privileged policy actions when CSN is not Profile Owner.
+- Show raw VPN-service query count, eligible Always-on services and rejected candidates. A zero result is **not** described as proof that no VPN apps are installed.
+- Check presence of known WireGuard package with explicit manifest package visibility. This is diagnostic only; a package's existence does **not** establish that it exposes an eligible VpnService.
+- Open native Android VPN Settings and copy a sanitized diagnostic report through the clipboard. No account, VPN keys, package inventory or network permission used.
+- Validate `android.net.VpnService.SUPPORTS_ALWAYS_ON` opt-out metadata before displaying eligible services.
+
+**Remaining runtime gate:** install and test v0.1.1 on the Lenovo; compare its count with Android Settings. No migration of Shelter, VPN policy, timezone or DUORAY settings is authorized by this patch.
