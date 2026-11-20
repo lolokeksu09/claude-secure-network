@@ -17,6 +17,16 @@
 - [TESTING-LEVELS.md](TESTING-LEVELS.md) — риск-ориентированная система проверок.
 - [templates/](templates/) — шаблоны планов, аудита, проверки и выпуска. Они **не являются** выполненными работами.
 
+## Собственное Android-приложение (alpha)
+
+В ветке `feat/csn-guardian-dpc` разрабатывается [CSN Guardian](docs/GUARDIAN_ARCHITECTURE.md) — собственный Device Policy Controller для нового рабочего профиля Android. Это чистая реализация на Android SDK (без копирования Shelter), а не настроенный VPN или готовый релиз.
+
+- Код: [app/](app/). Android 26+, Java 17, `compileSdk=35`, без разрешения `INTERNET`.
+- Контроль: перечисление установленных VPN-служб; только Profile Owner может назначить Always-on + Lockdown с ручным подтверждением; проверка применения политики.
+- Сборка: CI выполняет `gradle :app:testDebugUnitTest :app:assembleDebug` с Gradle 8.11.1/JDK17. Статус сборки проверять по фактическому GitHub Actions run.
+- Безопасная миграция: Shelter уже владеет рабочим профилем `User 10`. Данные профиля будут утрачены при его удалении; новый контроллер НЕ удаляет и НЕ заменяет его автоматически. Сначала нужны резервные копии и отдельное разрешение.
+- Доступ к сети, включая DUORAY и настройки личного профиля, сейчас не изменён. APK не установлен на Lenovo.
+
 ## Первый запуск
 
 1. Прочитать [AGENTS.md](AGENTS.md), [PROJECT.md](PROJECT.md) и [ТЗ](docs/TECHNICAL_SPECIFICATION.md).
