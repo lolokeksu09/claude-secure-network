@@ -152,3 +152,26 @@ and a destination through Android Sharesheet. The switch defaults **off** until 
   cases require a targeted file-picker or FileProvider handoff, not broad permissions.
 
 Reference: https://developer.android.com/reference/android/app/admin/DevicePolicyManager#addCrossProfileIntentFilter(android.content.ComponentName,android.content.IntentFilter,int)
+
+## Upgrade blocker: ephemeral GitHub debug APK signing (20 Nov 2026)
+
+The CI workflow relies on the default per-run Android debug keystore. This is **not
+a stable signing identity** for upgrades of an installed Profile Owner app.
+
+The APK signing-block v2 certificate fingerprints were extracted and compared:
+- Earlier artifact, run `44711177603`: SHA-256
+  `8fb6465a3b6451928f24c70af6c0d7bab3041d662ad78b71ebbf5e3c4f338062`.
+- New v0.1.3 debug artifact, run `44714525134`: SHA-256
+  `1a80a20ab2e29b933db4374bf7a2479af7497102ef719888ac1bad32497b4338`.
+
+They differ. **Do not tell the owner to uninstall Guardian or delete User 11 to
+update.** Android rejects upgrades with a different package-signing certificate.
+The exact currently installed APK signing certificate has not yet been read back
+from the Lenovo; the certificate mismatch between these two CI artifacts is confirmed.
+
+Before shipping updates, establish a private, persistent, securely backed up signing key
+managed through GitHub Actions secrets (never commit the keystore or passwords).
+For the *existing* installed Guardian, a new permanent key alone cannot update its
+package: first determine whether its original signing key still exists. If not, any
+profile recreation or migration is a separate **data-destructive** operation requiring
+explicit informed approval and verified backup. No reset authorized or performed.
