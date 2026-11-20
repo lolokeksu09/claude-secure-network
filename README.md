@@ -27,6 +27,10 @@
 - Безопасная миграция: Shelter уже владеет рабочим профилем `User 10`. Данные профиля будут утрачены при его удалении; новый контроллер НЕ удаляет и НЕ заменяет его автоматически. Сначала нужны резервные копии и отдельное разрешение.
 - Доступ к сети, включая DUORAY и настройки личного профиля, сейчас не изменён. APK не установлен на Lenovo.
 
+### Guardian v0.1.1-alpha
+
+This branch improves the read-only diagnostic mode for the existing Shelter device: compact owner-aware UI, explicit VPN-service query counts, WireGuard presence check, and a link to Android's VPN settings. It does not gain ownership of the existing work profile. Build success does not prove VPN discovery works on the Lenovo; device comparison remains pending.
+
 ## Первый запуск
 
 1. Прочитать [AGENTS.md](AGENTS.md), [PROJECT.md](PROJECT.md) и [ТЗ](docs/TECHNICAL_SPECIFICATION.md).
