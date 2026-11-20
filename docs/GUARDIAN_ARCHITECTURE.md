@@ -113,7 +113,7 @@ With Shizuku running, open Termux and execute:
 cd "$HOME" && ./rish -c 'sleep 10; dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | head -n 4'
 ```
 
-Switch to **DUORAY** during the ten seconds. The output should identify the foreground DUORAY package using `ActivityRecord{... u0 PACKAGE/...}`. Do not paste any config or subscription link. If this view is empty, use the system package info screen or an alternate `dumpsys window` foreground activity probe.
+Switch to **DUORAY** during the ten seconds. The output should identify the foreground DUORAY package using `ActivityRecord{... u0 PACKAGE/...}` in the personal profile or `u10` in the work profile. Do not paste any config or subscription link. If this view is empty, use the system package info screen or an alternate `dumpsys window` foreground activity probe.
 
 After identifying the actual DUORAY package, inspect its **service registration** and Always-on opt-out metadata via Android shell before proposing explicit package visibility. Do not broaden permissions to `QUERY_ALL_PACKAGES` merely to enumerate VPN apps. No policy writes or profile migration during diagnosis.
 
